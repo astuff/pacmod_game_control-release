@@ -1,0 +1,12 @@
+Source: ros-lunar-pacmod-game-control
+Section: misc
+Priority: extra
+Maintainer: AutonomouStuff Software Development Team <software@autonomoustuff.com>
+Build-Depends: debhelper (>= 9.0.0), ros-lunar-catkin, ros-lunar-joy, ros-lunar-pacmod-msgs, ros-lunar-roscpp, ros-lunar-sensor-msgs, ros-lunar-std-msgs
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-lunar-pacmod-game-control
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lunar-joy, ros-lunar-pacmod-msgs, ros-lunar-roscpp, ros-lunar-sensor-msgs, ros-lunar-std-msgs
+Description: ROS Package for controlling the AStuff PACMod with a Joystick
