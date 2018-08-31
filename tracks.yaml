@@ -90,8 +90,8 @@ tracks:
     patches: null
     release_inc: '1'
     release_repo_url: git@github.com:astuff/pacmod_game_control-release.git
-    release_tag: 2.1.0
+    release_tag: :{version}
     ros_distro: melodic
     vcs_type: git
     vcs_uri: https://github.com/astuff/pacmod_game_control.git
-    version: 2.1.0
+    version: :{auto}
