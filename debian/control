@@ -1,0 +1,12 @@
+Source: ros-kinetic-pacmod-game-control
+Section: misc
+Priority: extra
+Maintainer: AutonomouStuff Software Development Team <software@autonomoustuff.com>
+Build-Depends: debhelper (>= 9.0.0), ros-kinetic-catkin, ros-kinetic-joy, ros-kinetic-pacmod-msgs, ros-kinetic-roscpp, ros-kinetic-sensor-msgs, ros-kinetic-std-msgs
+Homepage: http://wiki.ros.org/pacmod_game_control
+Standards-Version: 3.9.2
+
+Package: ros-kinetic-pacmod-game-control
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kinetic-joy, ros-kinetic-pacmod-msgs, ros-kinetic-roscpp, ros-kinetic-sensor-msgs, ros-kinetic-std-msgs
+Description: ROS Package for controlling the AStuff PACMod with a Joystick
