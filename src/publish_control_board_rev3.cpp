@@ -5,12 +5,13 @@
 * See file LICENSE included with this software or go to https://opensource.org/licenses/MIT for full license details.
 */
 
-#include "publish_control_board_rev3.h"
+#include "pacmod_game_control/publish_control_board_rev3.h"
 
-using namespace AS::Joystick;
+using namespace AS::Joystick;  // NOLINT
 
-int PublishControlBoardRev3::last_shift_cmd = SHIFT_NEUTRAL;
-int PublishControlBoardRev3::last_turn_cmd = SIGNAL_OFF;
+int PublishControlBoardRev3::last_shift_cmd = pacmod_msgs::SystemCmdInt::SHIFT_NEUTRAL;
+int PublishControlBoardRev3::last_turn_cmd = pacmod_msgs::SystemCmdInt::TURN_NONE;
+int PublishControlBoardRev3::last_rear_pass_door_cmd = pacmod_msgs::SystemCmdInt::DOOR_NEUTRAL;
 float PublishControlBoardRev3::last_brake_cmd = 0.0;
 
 PublishControlBoardRev3::PublishControlBoardRev3() :
@@ -20,9 +21,12 @@ PublishControlBoardRev3::PublishControlBoardRev3() :
   enable_sub = n.subscribe("/pacmod/as_tx/enabled", 20, &PublishControl::callback_pacmod_enable);
   shift_sub = n.subscribe("/pacmod/parsed_tx/shift_rpt", 20, &PublishControlBoardRev3::callback_shift_rpt);
   turn_sub = n.subscribe("/pacmod/parsed_tx/turn_rpt", 20, &PublishControlBoardRev3::callback_turn_rpt);
+  rear_pass_door_sub = n.subscribe("/pacmod/parsed_tx/rear_pass_door_rpt",
+                                   20, &PublishControlBoardRev3::callback_rear_pass_door_rpt);
 
   // Advertise published messages
   turn_signal_cmd_pub = n.advertise<pacmod_msgs::SystemCmdInt>("/pacmod/as_rx/turn_cmd", 20);
+  rear_pass_door_cmd_pub = n.advertise<pacmod_msgs::SystemCmdInt>("/pacmod/as_rx/rear_pass_door_cmd", 20);
   headlight_cmd_pub = n.advertise<pacmod_msgs::SystemCmdInt>("/pacmod/as_rx/headlight_cmd", 20);
   horn_cmd_pub = n.advertise<pacmod_msgs::SystemCmdBool>("/pacmod/as_rx/horn_cmd", 20);
   wiper_cmd_pub = n.advertise<pacmod_msgs::SystemCmdInt>("/pacmod/as_rx/wiper_cmd", 20);
@@ -48,6 +52,14 @@ void PublishControlBoardRev3::callback_turn_rpt(const pacmod_msgs::SystemRptInt:
   turn_mutex.unlock();
 }
 
+void PublishControlBoardRev3::callback_rear_pass_door_rpt(const pacmod_msgs::SystemRptInt::ConstPtr& msg)
+{
+  rear_pass_door_mutex.lock();
+  // Store the latest value read to be sent on enable/disable
+  last_rear_pass_door_cmd = msg->output;
+  rear_pass_door_mutex.unlock();
+}
+
 void PublishControlBoardRev3::publish_steering_message(const sensor_msgs::Joy::ConstPtr& msg)
 {
   // Steering
@@ -65,7 +77,11 @@ void PublishControlBoardRev3::publish_steering_message(const sensor_msgs::Joy::C
   }
 
   float range_scale;
-  if (vehicle_type == VEHICLE_4 || vehicle_type == VEHICLE_6)
+  if (vehicle_type == VEHICLE_4 ||
+      vehicle_type == VEHICLE_6 ||
+      vehicle_type == LEXUS_RX_450H ||
+      vehicle_type == FREIGHTLINER_CASCADIA ||
+      vehicle_type == JUPITER_SPIRIT)
     range_scale = 1.0;
   else
     range_scale = fabs(msg->axes[axes[steering_axis]]) * (STEER_OFFSET - ROT_RANGE_SCALER_LB) + ROT_RANGE_SCALER_LB;
@@ -85,7 +101,11 @@ void PublishControlBoardRev3::publish_steering_message(const sensor_msgs::Joy::C
   speed_mutex.unlock();
 
   if (speed_valid)
-    speed_scale = STEER_OFFSET - fabs((current_speed / (max_veh_speed * STEER_SCALE_FACTOR))); //Never want to reach 0 speed scale.
+    if (current_speed < max_veh_speed)
+      speed_scale = STEER_OFFSET - fabs(
+        (current_speed / (max_veh_speed * STEER_SCALE_FACTOR)));  // this could go negative.
+    else
+       speed_scale = 0.33333;  // clips the equation assuming 1 offset and 1.5 scale_factor
 
   steer_msg.command = (range_scale * max_rot_rad) * msg->axes[axes[steering_axis]];
   steer_msg.rotation_rate = steering_max_speed * speed_scale;
@@ -111,14 +131,14 @@ void PublishControlBoardRev3::publish_turn_signal_message(const sensor_msgs::Joy
   {
     // Axis 2 is the "left trigger" and axis 5 is the "right trigger" single
     // axis joysticks on the back of the controller
-    if(msg->axes[2] < -0.5)
-      turn_signal_cmd_pub_msg.command = SIGNAL_HAZARD;
-    else if(msg->axes[5] > 0.5)
-      turn_signal_cmd_pub_msg.command = SIGNAL_LEFT;
-    else if(msg->axes[5] < -0.5)
-      turn_signal_cmd_pub_msg.command = SIGNAL_RIGHT;
+    if (msg->axes[2] < -0.5)
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_HAZARDS;
+    else if (msg->axes[5] > 0.5)
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_LEFT;
+    else if (msg->axes[5] < -0.5)
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_RIGHT;
     else
-      turn_signal_cmd_pub_msg.command = SIGNAL_OFF;
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_NONE;
 
     if (last_axes.empty() ||
         last_axes[2] != msg->axes[2] ||
@@ -126,23 +146,23 @@ void PublishControlBoardRev3::publish_turn_signal_message(const sensor_msgs::Joy
         local_enable != prev_enable)
       turn_signal_cmd_pub.publish(turn_signal_cmd_pub_msg);
   }
-  else //Every other controller
+  else  // Every other controller
   {
     if (msg->axes[axes[DPAD_LR]] == AXES_MAX)
-      turn_signal_cmd_pub_msg.command = SIGNAL_LEFT;
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_LEFT;
     else if (msg->axes[axes[DPAD_LR]] == AXES_MIN)
-      turn_signal_cmd_pub_msg.command = SIGNAL_RIGHT;
-    else if (msg->axes[axes[DPAD_UD]] == AXES_MIN)
-      turn_signal_cmd_pub_msg.command = SIGNAL_HAZARD;
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_RIGHT;
+    else if (msg->axes[axes[DPAD_UD]] == AXES_MIN && msg->buttons[btns[LEFT_BUMPER]] != BUTTON_DOWN)
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_HAZARDS;
     else if (local_enable != prev_enable)
     {
       if (vehicle_type == VEHICLE_6)
-        turn_signal_cmd_pub_msg.command = SIGNAL_OFF;
+        turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_NONE;
       else
         turn_signal_cmd_pub_msg.command = last_turn_cmd;
     }
     else
-      turn_signal_cmd_pub_msg.command = SIGNAL_OFF;
+      turn_signal_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::TURN_NONE;
 
     if (last_axes.empty() ||
         last_axes[axes[DPAD_LR]] != msg->axes[axes[DPAD_LR]] ||
@@ -171,25 +191,26 @@ void PublishControlBoardRev3::publish_shifting_message(const sensor_msgs::Joy::C
     }
 
     uint8_t desired_gear = 0x0;
-    desired_gear |= (msg->buttons[btns[RIGHT_BTN]]  == BUTTON_DOWN) << SHIFT_REVERSE
-                  | (msg->buttons[btns[BOTTOM_BTN]] == BUTTON_DOWN) << SHIFT_LOW
-                  | (msg->buttons[btns[TOP_BTN]]    == BUTTON_DOWN) << SHIFT_PARK
-                  | (msg->buttons[btns[LEFT_BTN]]   == BUTTON_DOWN) << SHIFT_NEUTRAL;
+    desired_gear |= (msg->buttons[btns[RIGHT_BTN]]  == BUTTON_DOWN) << pacmod_msgs::SystemCmdInt::SHIFT_REVERSE
+                  | (msg->buttons[btns[BOTTOM_BTN]] == BUTTON_DOWN) << pacmod_msgs::SystemCmdInt::SHIFT_HIGH
+                  | (msg->buttons[btns[TOP_BTN]]    == BUTTON_DOWN) << pacmod_msgs::SystemCmdInt::SHIFT_PARK
+                  | (msg->buttons[btns[LEFT_BTN]]   == BUTTON_DOWN) << pacmod_msgs::SystemCmdInt::SHIFT_NEUTRAL;
 
-    switch(desired_gear){
-      case 1<<SHIFT_REVERSE:
-        shift_cmd_pub_msg.command = SHIFT_REVERSE;
+    switch (desired_gear)
+    {
+      case 1 << pacmod_msgs::SystemCmdInt::SHIFT_REVERSE:
+        shift_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::SHIFT_REVERSE;
         break;
-      case 1<<SHIFT_LOW:
-        shift_cmd_pub_msg.command = SHIFT_LOW;
+      case 1 << pacmod_msgs::SystemCmdInt::SHIFT_HIGH:
+        shift_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::SHIFT_HIGH;
         break;
-      case 1<<SHIFT_PARK:
-        shift_cmd_pub_msg.command = SHIFT_PARK;
+      case 1 << pacmod_msgs::SystemCmdInt::SHIFT_PARK:
+        shift_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::SHIFT_PARK;
         break;
-      case 1<<SHIFT_NEUTRAL:
-        shift_cmd_pub_msg.command = SHIFT_NEUTRAL;
+      case 1 << pacmod_msgs::SystemCmdInt::SHIFT_NEUTRAL:
+        shift_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::SHIFT_NEUTRAL;
         break;
-      //If we've got an invalid command (or multiple buttons pressed) return and don't publish the message
+      // If we've got an invalid command (or multiple buttons pressed) return and don't publish the message
       default: return;
     }
      shift_cmd_pub.publish(shift_cmd_pub_msg);
@@ -232,23 +253,28 @@ void PublishControlBoardRev3::publish_accelerator_message(const sensor_msgs::Joy
     if (msg->axes[axes[RIGHT_STICK_UD]] >= 0.0)
     {
       // only consider center-to-up range as accelerator motion
-      accelerator_cmd_pub_msg.command = accel_scale_val * (msg->axes[axes[RIGHT_STICK_UD]]) * ACCEL_SCALE_FACTOR + ACCEL_OFFSET;
+      accelerator_cmd_pub_msg.command = accel_scale_val * (msg->axes[axes[RIGHT_STICK_UD]]);
     }
   }
-  else if(controller == LOGITECH_G29)
+  else if (controller == LOGITECH_G29)
   {
     if (msg->axes[axes[RIGHT_TRIGGER_AXIS]] != 0)
       PublishControl::accel_0_rcvd = true;
 
     if (PublishControl::accel_0_rcvd)
     {
-      if (vehicle_type == LEXUS_RX_450H ||
+      if (vehicle_type == POLARIS_RANGER ||
+          vehicle_type == LEXUS_RX_450H ||
+          vehicle_type == FREIGHTLINER_CASCADIA ||
+          vehicle_type == JUPITER_SPIRIT ||
           vehicle_type == VEHICLE_4 ||
           vehicle_type == VEHICLE_5 ||
           vehicle_type == VEHICLE_6)
-        accelerator_cmd_pub_msg.command = accel_scale_val * (0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] + 1.0));
+        accelerator_cmd_pub_msg.command =
+          accel_scale_val * (0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] + 1.0));
       else
-        accelerator_cmd_pub_msg.command = accel_scale_val * (0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] + 1.0)) * ACCEL_SCALE_FACTOR + ACCEL_OFFSET;
+        accelerator_cmd_pub_msg.command =
+          accel_scale_val * (0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] + 1.0)) * ACCEL_SCALE_FACTOR + ACCEL_OFFSET;
     }
     else
     {
@@ -262,13 +288,18 @@ void PublishControlBoardRev3::publish_accelerator_message(const sensor_msgs::Joy
 
     if (PublishControl::accel_0_rcvd)
     {
-      if (vehicle_type == LEXUS_RX_450H ||
+      if (vehicle_type == POLARIS_RANGER ||
+          vehicle_type == LEXUS_RX_450H ||
+          vehicle_type == FREIGHTLINER_CASCADIA ||
+          vehicle_type == JUPITER_SPIRIT ||
           vehicle_type == VEHICLE_4 ||
           vehicle_type == VEHICLE_5 ||
           vehicle_type == VEHICLE_6)
-        accelerator_cmd_pub_msg.command = accel_scale_val * (-0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] - 1.0));
+        accelerator_cmd_pub_msg.command =
+          accel_scale_val * (-0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] - 1.0));
       else
-        accelerator_cmd_pub_msg.command = accel_scale_val * (-0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] - 1.0)) * ACCEL_SCALE_FACTOR + ACCEL_OFFSET;
+        accelerator_cmd_pub_msg.command =
+          accel_scale_val * (-0.5 * (msg->axes[axes[RIGHT_TRIGGER_AXIS]] - 1.0)) * ACCEL_SCALE_FACTOR + ACCEL_OFFSET;
     }
     else
     {
@@ -296,7 +327,7 @@ void PublishControlBoardRev3::publish_brake_message(const sensor_msgs::Joy::Cons
   {
     brake_msg.command = (msg->axes[axes[RIGHT_STICK_UD]] > 0.0) ? 0.0 : -(brake_scale_val * msg->axes[4]);
   }
-  else if(controller == LOGITECH_G29)
+  else if (controller == LOGITECH_G29)
   {
     if (msg->axes[axes[LEFT_TRIGGER_AXIS]] != 0)
       PublishControl::brake_0_rcvd = true;
@@ -318,7 +349,7 @@ void PublishControlBoardRev3::publish_brake_message(const sensor_msgs::Joy::Cons
     if (PublishControl::brake_0_rcvd)
     {
       float brake_value = -((msg->axes[axes[LEFT_TRIGGER_AXIS]] - 1.0) / 2.0) * brake_scale_val;
-      if(vehicle_type == LEXUS_RX_450H)
+      if (vehicle_type == LEXUS_RX_450H)
       {
         // These constants came from playing around in excel until stuff looked good. Seems to work okay
         brake_msg.command = fmin(pow(brake_value, 3) * 2.0F - pow(brake_value, 2) * 1.5F + brake_value * 0.625F, 1.0F);
@@ -343,7 +374,9 @@ void PublishControlBoardRev3::publish_lights_horn_wipers_message(const sensor_ms
 {
   if ((vehicle_type == LEXUS_RX_450H ||
        vehicle_type == VEHICLE_5 ||
-       vehicle_type == VEHICLE_6) &&
+       vehicle_type == VEHICLE_6 ||
+       vehicle_type == FREIGHTLINER_CASCADIA ||
+       vehicle_type == JUPITER_SPIRIT) &&
       controller != HRI_SAFE_REMOTE)
   {
     pacmod_msgs::SystemCmdInt headlight_cmd_pub_msg;
@@ -351,14 +384,14 @@ void PublishControlBoardRev3::publish_lights_horn_wipers_message(const sensor_ms
     headlight_cmd_pub_msg.ignore_overrides = false;
 
     // Headlights
-    if (msg->axes[axes[DPAD_UD]] == AXES_MAX)
+    if (msg->axes[axes[DPAD_UD]] == AXES_MAX && msg->buttons[btns[LEFT_BUMPER]] != BUTTON_DOWN)
     {
       if (vehicle_type == VEHICLE_5)
       {
-        if (PublishControl::headlight_state == 4)
-          PublishControl::headlight_state = 5;
+        if (PublishControl::headlight_state == 1)
+          PublishControl::headlight_state = 2;
         else
-          PublishControl::headlight_state = 4;
+          PublishControl::headlight_state = 1;
       }
       else
       {
@@ -409,7 +442,7 @@ void PublishControlBoardRev3::publish_lights_horn_wipers_message(const sensor_ms
     horn_cmd_pub.publish(horn_cmd_pub_msg);
   }
 
-  if (vehicle_type == INTERNATIONAL_PROSTAR && controller != HRI_SAFE_REMOTE) // Semi
+  if (vehicle_type == INTERNATIONAL_PROSTAR && controller != HRI_SAFE_REMOTE)  // Semi
   {
     pacmod_msgs::SystemCmdInt wiper_cmd_pub_msg;
     wiper_cmd_pub_msg.enable = local_enable;
@@ -436,5 +469,42 @@ void PublishControlBoardRev3::publish_lights_horn_wipers_message(const sensor_ms
     }
 
     wiper_cmd_pub.publish(wiper_cmd_pub_msg);
+  }
+}
+
+void PublishControlBoardRev3::publish_rear_pass_door_message(const sensor_msgs::Joy::ConstPtr& msg)
+{
+  pacmod_msgs::SystemCmdInt rear_pass_door_cmd_pub_msg;
+
+  rear_pass_door_cmd_pub_msg.enable = local_enable;
+  rear_pass_door_cmd_pub_msg.ignore_overrides = false;
+
+  // If the enable flag just went to true, send an override clear
+  if (!prev_enable && local_enable)
+  {
+    rear_pass_door_cmd_pub_msg.clear_override = true;
+    rear_pass_door_cmd_pub_msg.clear_faults = true;
+  }
+
+  if (vehicle_type == JUPITER_SPIRIT)
+  {
+    if (controller != HRI_SAFE_REMOTE)
+    {
+      if (msg->axes[axes[DPAD_UD]] == AXES_MAX && msg->buttons[btns[LEFT_BUMPER]] == BUTTON_DOWN)
+        rear_pass_door_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::DOOR_CLOSE;
+      else if (msg->axes[axes[DPAD_UD]] == AXES_MIN && msg->buttons[btns[LEFT_BUMPER]] == BUTTON_DOWN)
+        rear_pass_door_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::DOOR_OPEN;
+      else if (local_enable != prev_enable)
+        rear_pass_door_cmd_pub_msg.command = last_rear_pass_door_cmd;
+      else
+        rear_pass_door_cmd_pub_msg.command = pacmod_msgs::SystemCmdInt::DOOR_NEUTRAL;
+      // Send messages when enabled, or when the state changes between axes[DPAD_UD], or between enabled/disabled
+      if (last_axes.empty() ||
+          last_axes[axes[DPAD_UD]] != msg->axes[axes[DPAD_UD]] ||
+          local_enable != prev_enable)
+      {
+          rear_pass_door_cmd_pub.publish(rear_pass_door_cmd_pub_msg);
+      }
+    }
   }
 }
