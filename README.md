@@ -1,3 +1,26 @@
+## pacmod_game_control (kinetic) - 3.0.1-1
+
+The packages in the `pacmod_game_control` repository were released into the `kinetic` distro by running `/usr/bin/bloom-release --ros-distro kinetic --track kinetic pacmod_game_control` on `Thu, 06 Feb 2020 21:05:54 -0000`
+
+The `pacmod_game_control` package was released.
+
+Version of package(s) in repository `pacmod_game_control`:
+
+- upstream repository: https://github.com/astuff/pacmod_game_control.git
+- release repository: https://github.com/astuff/pacmod_game_control-release.git
+- rosdistro version: `2.3.0-0`
+- old version: `2.3.0-0`
+- new version: `3.0.1-1`
+
+Versions of tools used:
+
+- bloom version: `0.9.0`
+- catkin_pkg version: `0.4.15`
+- rosdep version: `0.18.0`
+- rosdistro version: `0.8.0`
+- vcstools version: `0.1.40`
+
+
 ## pacmod_game_control (melodic) - 2.3.0-0
 
 The packages in the `pacmod_game_control` repository were released into the `melodic` distro by running `/usr/bin/bloom-release --ros-distro melodic --track melodic pacmod_game_control` on `Wed, 12 Dec 2018 22:33:11 -0000`
