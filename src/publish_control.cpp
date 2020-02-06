@@ -5,9 +5,9 @@
 * See file LICENSE included with this software or go to https://opensource.org/licenses/MIT for full license details.
 */
 
-#include "publish_control.h"
+#include "pacmod_game_control/publish_control.h"
 
-using namespace AS::Joystick;
+using namespace AS::Joystick;  // NOLINT
 
 JoyAxis PublishControl::steering_axis = LEFT_STICK_LR;
 float PublishControl::max_rot_rad = MAX_ROT_RAD_DEFAULT;
@@ -58,6 +58,9 @@ void PublishControl::callback_control(const sensor_msgs::Joy::ConstPtr& msg)
 
       // Turn signals
       publish_turn_signal_message(msg);
+
+      // Door signals
+      publish_rear_pass_door_message(msg);
 
       // Shifting
       publish_shifting_message(msg);
@@ -144,7 +147,8 @@ void PublishControl::check_is_enabled(const sensor_msgs::Joy::ConstPtr& msg)
   else
   {
     // Enable
-    if (msg->buttons[btns[START_PLUS]] == BUTTON_DOWN && msg->buttons[btns[BACK_SELECT_MINUS]] == BUTTON_DOWN && !local_enable)
+    if (msg->buttons[btns[START_PLUS]] == BUTTON_DOWN &&
+        msg->buttons[btns[BACK_SELECT_MINUS]] == BUTTON_DOWN && !local_enable)
     {
       std_msgs::Bool bool_pub_msg;
       bool_pub_msg.data = true;
@@ -155,7 +159,8 @@ void PublishControl::check_is_enabled(const sensor_msgs::Joy::ConstPtr& msg)
     }
 
     // Disable
-    if (msg->buttons[btns[BACK_SELECT_MINUS]] == BUTTON_DOWN && msg->buttons[btns[START_PLUS]] != BUTTON_DOWN && local_enable)
+    if (msg->buttons[btns[BACK_SELECT_MINUS]] == BUTTON_DOWN &&
+        msg->buttons[btns[START_PLUS]] != BUTTON_DOWN && local_enable)
     {
       std_msgs::Bool bool_pub_msg;
       bool_pub_msg.data = false;
