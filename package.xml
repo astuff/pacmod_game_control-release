@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>pacmod_game_control</name>
-  <version>2.3.0</version>
+  <version>3.0.1</version>
   <description>ROS Package for controlling the AStuff PACMod with a Joystick</description>
   <license>MIT</license>
 
@@ -13,6 +13,8 @@
   <author email="jdriscoll@autonomoustuff.com">Joe Driscoll</author>
 
   <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>roslint</build_depend>
 
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
