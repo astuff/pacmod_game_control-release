@@ -5,8 +5,8 @@
 * See file LICENSE included with this software or go to https://opensource.org/licenses/MIT for full license details.
 */
 
-#ifndef GLOBALS_H
-#define GLOBALS_H
+#ifndef PACMOD_GAME_CONTROL_GLOBALS_H
+#define PACMOD_GAME_CONTROL_GLOBALS_H
 
 #include <cstdio>
 #include <mutex>
@@ -21,25 +21,6 @@ namespace AS
 {
 namespace Joystick
 {
-
-// Enums
-enum ShiftState
-{
-  SHIFT_PARK = 0,
-  SHIFT_REVERSE = 1,
-  SHIFT_NEUTRAL = 2,
-  SHIFT_LOW = 3,
-  SHIFT_HIGH = 4
-};
-
-enum TurnSignalState
-{
-  SIGNAL_RIGHT,
-  SIGNAL_OFF,
-  SIGNAL_LEFT,
-  SIGNAL_HAZARD
-};
-
 enum GamepadType
 {
   LOGITECH_F310,
@@ -55,9 +36,11 @@ enum VehicleType
   POLARIS_RANGER,
   LEXUS_RX_450H,
   INTERNATIONAL_PROSTAR,
+  FREIGHTLINER_CASCADIA,
   VEHICLE_4,
   VEHICLE_5,
-  VEHICLE_6
+  VEHICLE_6,
+  JUPITER_SPIRIT
 };
 
 enum JoyAxis
@@ -103,10 +86,12 @@ static const float ACCEL_SCALE_FACTOR = 0.6;
 static const float ACCEL_OFFSET = 0.21;
 static const float STEER_SCALE_FACTOR = 1.5;
 static const float STEER_OFFSET = 1.0;
-static const float MAX_ROT_RAD_VEHICLE2 = 6.5;
+static const float MAX_ROT_RAD_VEHICLE2 = 8.5;
 static const float MAX_ROT_RAD_VEHICLE4 = 8.5;
 static const float MAX_ROT_RAD_VEHICLE5 = 8.1;
 static const float MAX_ROT_RAD_VEHICLE6 = 8.5;
+static const float MAX_ROT_RAD_FREIGHTLINER_CASCADIA = 14.0;
+static const float MAX_ROT_RAD_JUPITER_SPIRIT = 8.5;
 static const float MAX_ROT_RAD_DEFAULT = 10.9956;
 static const float AXES_MIN = -1.0;
 static const float AXES_MAX = 1.0;
@@ -123,8 +108,9 @@ static std::mutex speed_mutex;
 static std::mutex state_change_mutex;
 static std::mutex shift_mutex;
 static std::mutex turn_mutex;
+static std::mutex rear_pass_door_mutex;
 
-}
-}
+}  // namespace Joystick
+}  // namespace AS
 
-#endif
+#endif  // PACMOD_GAME_CONTROL_GLOBALS_H
