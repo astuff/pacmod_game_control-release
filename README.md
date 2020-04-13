@@ -1,3 +1,26 @@
+## pacmod_game_control (melodic) - 3.0.2-1
+
+The packages in the `pacmod_game_control` repository were released into the `melodic` distro by running `/usr/bin/bloom-release --ros-distro melodic --track melodic pacmod_game_control --edit` on `Mon, 13 Apr 2020 17:09:30 -0000`
+
+The `pacmod_game_control` package was released.
+
+Version of package(s) in repository `pacmod_game_control`:
+
+- upstream repository: https://github.com/astuff/pacmod_game_control.git
+- release repository: https://github.com/astuff/pacmod_game_control-release.git
+- rosdistro version: `3.0.1-1`
+- old version: `3.0.1-1`
+- new version: `3.0.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.9.3`
+- catkin_pkg version: `0.4.16`
+- rosdep version: `0.18.0`
+- rosdistro version: `0.8.0`
+- vcstools version: `0.1.42`
+
+
 ## pacmod_game_control (melodic) - 3.0.1-1
 
 The packages in the `pacmod_game_control` repository were released into the `melodic` distro by running `/usr/bin/bloom-release --ros-distro melodic --track melodic pacmod_game_control` on `Thu, 06 Feb 2020 21:10:41 -0000`
